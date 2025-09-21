@@ -2,7 +2,7 @@
 name = "reinforcement-learning-tp1"
 version = "0.1.0"
 description = ""
-authors = ["Pierre-Louis Guhur <pierre-louis.guhur@laposte.net>"]
+authors = ["Pierre-Louis Guhur <pierre-louis.guhur@laposte.net>", "Arthur Courselle <arthur.courselle@epita.fr>"]
 readme = "README.md"
 packages = []
 
