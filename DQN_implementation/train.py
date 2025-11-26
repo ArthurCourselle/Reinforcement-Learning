@@ -7,17 +7,28 @@ import torch
 
 from dqn import DQNAgent
 
-from utils import preprocess, stack_frames
+# from utils import preprocess, stack_frames
+from utils import to_torch_order
 from config import Config
 
 # from torch.utils.tensorboard import SummaryWriter
 from tensorboardX import SummaryWriter
 
 import numpy as np
+from gymnasium.wrappers import AtariPreprocessing, FrameStackObservation
 
 
 def train(config: Config):
-    env = gym.make(config.env_name, render_mode=None)
+    env = gym.make(config.env_name, render_mode=None, frameskip=1)
+
+    env = AtariPreprocessing(
+        env,
+        grayscale_obs=True,
+        scale_obs=True,
+        frame_skip=4,
+    )
+    env = FrameStackObservation(env, config.num_frames)
+
     agent = DQNAgent(env, config)
     writer = SummaryWriter(log_dir=f"runs/{config.env_name}")
     episode = 0
@@ -28,23 +39,28 @@ def train(config: Config):
         # )
         episode = agent.load(f"checkpoints/{config.env_name}_dqn_latest.pth")
 
-    state = preprocess(env.reset()[0])
-    state_stack, frames = stack_frames(None, state, True, config.num_frames)
+    obs, _ = env.reset()
+    state_stack = to_torch_order(obs)
 
     print("Filling replay memory...")
     while len(agent.memory) < config.min_replay_size:
         action = env.action_space.sample()
-        next_frame, reward, done, truncated, _ = env.step(action)
-        next_frame = preprocess(next_frame)
-        next_state_stack, frames = stack_frames(
-            frames, next_frame, False, config.num_frames
-        )
+        next_obs, reward, done, truncated, _ = env.step(action)
+        # next_frame = preprocess(next_frame)
+        # next_state_stack, frames = stack_frames(
+        #     frames, next_frame, False, config.num_frames
+        # )
+        next_state_stack = to_torch_order(next_obs)
+
         agent.memory.push(state_stack, action, reward, next_state_stack, done)
         state_stack = next_state_stack
         if done:
-            state_stack, frames = stack_frames(
-                None, preprocess(env.reset()[0]), True, config.num_frames
-            )
+            obs, _ = env.reset()
+            state_stack = to_torch_order(obs)
+
+            # state_stack, frames = stack_frames(
+            #     None, preprocess(env.reset()[0]), True, config.num_frames
+            # )
     print("Starting training...")
 
     rewards_history = []
@@ -55,34 +71,35 @@ def train(config: Config):
 
     while True:
         obs, _ = env.reset()
-        state = preprocess(obs)
-        state_stack, frames = stack_frames(None, state, True, config.num_frames)
+        state_stack = to_torch_order(obs)
+        # state = preprocess(obs)
+        # state_stack, frames = stack_frames(None, state, True, config.num_frames)
         total_reward = 0
+        total_loss = 0
+        total_q_value = 0
         done = False
 
         # rewards_history_ep = []
-        # loss_history_ep = []
-        # q_value_history_ep = []
-
-        total_loss = 0
-        total_q_value = 0
+        loss_history_ep = []
+        q_value_history_ep = []
 
         while not done:
             print("Step:", agent.steps_done, end="\r")
             action = agent.select_action(state_stack)
             next_obs, reward, done, truncated, _ = env.step(action)
-            next_frame = preprocess(next_obs)
-            next_state_stack, frames = stack_frames(
-                frames, next_frame, False, config.num_frames
-            )
+            # next_frame = preprocess(next_obs)
+            # next_state_stack, frames = stack_frames(
+            #     frames, next_frame, False, config.num_frames
+            # )
+            next_state_stack = to_torch_order(next_obs)
             agent.memory.push(state_stack, action, reward, next_state_stack, done)
             state_stack = next_state_stack
             total_reward += reward
 
             loss, q_value = agent.optimize()
             # rewards_history_ep.append(reward)
-            # loss_history_ep.append(loss)
-            # q_value_history_ep.append(q_value)
+            loss_history_ep.append(loss)
+            q_value_history_ep.append(q_value)
 
             total_loss += loss
             total_q_value += q_value
@@ -97,6 +114,8 @@ def train(config: Config):
         rewards_history.append(total_reward)
         loss_history.append(total_loss)
         q_value_history.append(total_q_value)
+        # loss_history.append(np.mean(loss_history_ep))
+        # q_value_history.append(np.mean(q_value_history_ep))
 
         if episode % config.log_every == 0:
             mean_reward = np.mean(rewards_history[-config.log_every :])
@@ -107,7 +126,7 @@ def train(config: Config):
             writer.add_scalar("Q_Value/Mean_50ep", mean_q_value, agent.steps_done)
 
             print(
-                f"Step {agent.steps_done}: Mean reward (last {config.log_every} steps) = {mean_reward:.2f}"
+                f"Step {agent.steps_done}: Mean reward (last {config.log_every} steps) = {mean_reward:.2f}, Mean loss = {mean_loss:.4f}, Mean Q value = {mean_q_value:.2f}"
             )
 
         if episode % config.save_every == 0:
@@ -116,7 +135,7 @@ def train(config: Config):
             agent.save(f"checkpoints/{config.env_name}_dqn_latest.pth", episode)
 
         print(
-            f"Episode {episode}, Total Reward: {total_reward}, Total Loss: {total_loss}, Total Q: {total_q_value}, Epsilon: {agent.epsilon:.3f}"
+            f"Episode {episode}, Total Reward: {total_reward}, Total Loss: {loss_history[-1]}, Total Q: {q_value_history[-1]}, Epsilon: {agent.epsilon:.3f}"
         )
 
 

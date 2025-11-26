@@ -10,7 +10,7 @@ class Config:
     lr: float = 1e-4
     batch_size: int = 32
     # memory_size: int = 100000
-    memory_size: int = 1000000
+    memory_size: int = 100000
     min_replay_size: int = 10000
     eps_start: float = 1.0
     eps_end: float = 0.1

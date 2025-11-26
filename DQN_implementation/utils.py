@@ -7,7 +7,6 @@ import random
 
 def to_torch_order(obs):
     obs = np.array(obs, dtype=np.float32)  # (84,84,4)
-    # obs = np.transpose(obs, (2, 0, 1))  # → (4,84,84)
     obs /= 255.0
     return obs
 
