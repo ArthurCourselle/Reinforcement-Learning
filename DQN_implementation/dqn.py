@@ -37,8 +37,8 @@ from config import Config
 class DQN(nn.Module):
     def __init__(self, input_shape: tuple, num_actions: int) -> None:
         super(DQN, self).__init__()
-        c, h, w = input_shape
-        self.conv1 = nn.Conv2d(in_channels=c, out_channels=16, kernel_size=8, stride=4)
+        # c, h, w = input_shape
+        self.conv1 = nn.Conv2d(in_channels=4, out_channels=16, kernel_size=8, stride=4)
         self.conv2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=4, stride=2)
         self.fc1 = nn.Linear(in_features=32 * 9 * 9, out_features=256)
         self.fc2 = nn.Linear(in_features=256, out_features=num_actions)
@@ -46,7 +46,8 @@ class DQN(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
-        x = x.view(x.size(0), -1)
+        # x = x.view(x.size(0), -1)
+        x = x.view(-1, 32 * 9 * 9)
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
         return x
