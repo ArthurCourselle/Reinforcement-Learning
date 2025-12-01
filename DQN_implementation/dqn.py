@@ -9,35 +9,10 @@ from utils import ReplayMemory
 from config import Config
 
 
-# class DQN(nn.Module):
-#     def __init__(self, input_shape: tuple, num_actions: int):
-#         super(DQN, self).__init__()
-#         c, h, w = input_shape
-#         self.net = nn.Sequential(
-#             # nn.Conv2d(c, 32, kernel_size=8, stride=4),
-#             nn.Conv2d(c, 16, kernel_size=8, stride=4),
-#             nn.ReLU(),
-#             # nn.Conv2d(32, 64, kernel_size=4, stride=2),
-#             nn.Conv2d(32, 32, kernel_size=4, stride=2),
-#             nn.ReLU(),
-#             # nn.Conv2d(64, 64, kernel_size=3, stride=1),
-#             nn.ReLU(),
-#             # nn.Flatten(),
-#             # nn.Linear(7 * 7 * 64, 512),
-#             nn.Linear(256, 512),
-#             nn.ReLU(),
-#             nn.Linear(512, num_actions),
-#             # nn.Linear(256, num_actions),
-#         )
-
-#     def forward(self, x: torch.Tensor) -> torch.Tensor:
-#         return self.net(x)
-
-
 class DQN(nn.Module):
     def __init__(self, input_shape: tuple, num_actions: int) -> None:
         super(DQN, self).__init__()
-        # c, h, w = input_shape
+        c, h, w = input_shape
         self.conv1 = nn.Conv2d(in_channels=4, out_channels=16, kernel_size=8, stride=4)
         self.conv2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=4, stride=2)
         self.fc1 = nn.Linear(in_features=32 * 9 * 9, out_features=256)
@@ -46,7 +21,6 @@ class DQN(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
-        # x = x.view(x.size(0), -1)
         x = x.view(-1, 32 * 9 * 9)
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
@@ -65,17 +39,17 @@ class DQNAgent:
         self.target_net.eval()
 
         self.memory = ReplayMemory(config.memory_size, config.device)
-        # self.optimizer = optim.Adam(self.policy_net.parameters(), lr=config.lr)
         self.optimizer = optim.RMSprop(self.policy_net.parameters(), lr=config.lr)
+
         self.steps_done = 0
         self.epsilon = config.eps_start
         self.config = config
-        self.loss = nn.MSELoss()
+        self.loss = F.smooth_l1_loss
 
     def select_action(self, state: np.ndarray) -> int:
         self.epsilon = max(
             self.config.eps_end,
-            self.config.eps_start - self.steps_done / self.config.eps_decay,
+            self.config.eps_start - (self.config.eps_start - self.config.eps_end) * (self.steps_done / self.config.eps_decay)
         )
         self.steps_done += 1
         if random.random() < self.epsilon:
@@ -94,14 +68,18 @@ class DQNAgent:
             self.config.batch_size
         )
         dones = dones.float()
-
         q_values = self.policy_net(states).gather(1, actions.unsqueeze(1)).squeeze(1)
-        next_q_values = self.target_net(next_states).max(1)[0]
-        target = rewards + self.config.gamma * next_q_values * (1 - dones)
+        
+        with torch.no_grad():
+            next_q_values = self.target_net(next_states).max(1)[0]
+            target = rewards + self.config.gamma * next_q_values * (1 - dones)
 
         loss = self.loss(q_values, target.detach())
         self.optimizer.zero_grad()
         loss.backward()
+
+        torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 1.0)
+
         self.optimizer.step()
 
         return loss.item(), q_values.mean().item()
