@@ -1,0 +1,9 @@
+gymnasium
+torch
+numpy
+matplotlib
+ale-py
+opencv-python
+tensorboard
+tensorboardX
+"gymnasium[other]"
