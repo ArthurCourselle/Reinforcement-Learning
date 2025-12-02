@@ -1,8 +1,0 @@
-runs/
-checkpoints/
-venv/
-.venv/
-__pycache__/
-.vscode/
-old/
-videos/ALE/*
