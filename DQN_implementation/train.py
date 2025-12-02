@@ -1,34 +1,17 @@
 import os
-import ale_py
-
-import gymnasium as gym
-
-import torch
 
 from dqn import DQNAgent
 
-from utils import to_torch_order
+from utils import to_torch_order, init_env
 from config import Config
 
 from tensorboardX import SummaryWriter
 
 import numpy as np
-from gymnasium.wrappers import AtariPreprocessing, FrameStackObservation
 
 
 def train(config: Config):
-    env = gym.make(config.env_name, render_mode="rgb_array", frameskip=1, repeat_action_probability=0.0)
-
-    env = AtariPreprocessing(
-        env,
-        noop_max=30,
-        screen_size=84,
-        grayscale_obs=True,
-        scale_obs=True,
-        frame_skip=4,
-        terminal_on_life_loss=False,
-    )
-    env = FrameStackObservation(env, config.num_frames)
+    env = init_env(config)
 
     agent = DQNAgent(env, config)
     writer = SummaryWriter(log_dir=f"runs/{config.env_name}")

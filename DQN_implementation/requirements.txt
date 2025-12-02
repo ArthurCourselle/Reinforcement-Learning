@@ -6,3 +6,4 @@ ale-py
 opencv-python
 tensorboard
 tensorboardX
+"gymnasium[other]"
